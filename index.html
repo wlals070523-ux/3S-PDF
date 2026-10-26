@@ -1,1 +1,1090 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PDF 이름 가리개</title>
+<style>
+:root{
+  --bg:#f4f6f5; --panel:#fff; --ink:#1b2620; --muted:#66746d; --faint:#94a19a; --line:#dfe6e2;
+  --g:#0b7a55; --g-dark:#086446; --g-soft:#eef7f2; --g-line:#0b7a55;
+  --red:#c0392b; --stage:#e9edeb;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--ink);font:14px/1.5 "Pretendard","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",system-ui,sans-serif;display:flex;flex-direction:column;overflow:hidden}
+button{font:inherit;color:inherit;cursor:pointer}
+button:disabled{cursor:not-allowed;opacity:.4}
+svg.i{width:18px;height:18px;flex:none;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 
+/* top bar */
+header{height:60px;flex:none;display:flex;align-items:center;gap:12px;padding:0 18px;background:var(--panel);border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:9px;font-weight:800;font-size:16px;white-space:nowrap}
+.logo{width:30px;height:30px;border-radius:8px;background:var(--g);display:grid;place-items:center;color:#fff}
+.logo svg{width:18px;height:18px}
+.doc{flex:1;min-width:0;padding-left:14px;margin-left:4px;border-left:1px solid var(--line)}
+.doc b{display:block;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.doc small{display:block;color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;height:38px;padding:0 14px;border:1px solid var(--line);background:#fff;border-radius:10px;white-space:nowrap;font-weight:600}
+.btn:hover:not(:disabled){background:#f7faf8;border-color:#c9d4ce}
+.btn.primary{background:var(--g);border-color:var(--g);color:#fff}
+.btn.primary:hover:not(:disabled){background:var(--g-dark)}
+.btn.quiet{border-color:transparent;background:transparent;font-weight:500;color:var(--muted)}
+.btn.quiet:hover:not(:disabled){background:#f1f4f2}
+.menu{position:relative}
+.hist{display:flex;gap:6px}
+.back{padding:0 10px 0 6px;color:var(--ink)}
+.menu-pop{position:absolute;right:0;top:44px;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.12);padding:6px;min-width:220px;z-index:30}
+.menu-pop button{display:flex;gap:10px;align-items:center;width:100%;border:0;background:none;padding:10px;border-radius:8px;text-align:left}
+.menu-pop button:hover{background:var(--g-soft)}
+.menu-pop small{display:block;color:var(--muted);font-size:12px}
+
+/* work area */
+.work{flex:1;display:flex;min-height:0}
+.rail{width:132px;flex:none;background:var(--panel);border-right:1px solid var(--line);overflow:auto;padding:14px 0 30px}
+.thumb{display:block;width:100%;border:0;background:none;padding:6px 18px 10px;text-align:center}
+.thumb .tp{position:relative;margin:0 auto;background:#fff;box-shadow:0 0 0 1px var(--line);border-radius:2px;overflow:hidden}
+.thumb canvas{position:absolute;inset:0;width:100%;height:100%}
+.thumb .tb{position:absolute;background:#fff;box-shadow:inset 0 0 0 1px rgba(11,122,85,.6)}
+.thumb.cur .tp{box-shadow:0 0 0 2.5px var(--g)}
+.thumb .tl{display:flex;justify-content:center;align-items:center;gap:6px;margin-top:6px;font-size:12px;color:var(--muted)}
+.thumb.cur .tl{color:var(--g);font-weight:700}
+.cnt{font-size:11px;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--g);color:#fff;font-weight:700;line-height:18px}
+.cnt.zero{background:#e5ebe8;color:var(--faint)}
+
+.stagewrap{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--stage)}
+.banner{flex:none;display:flex;align-items:center;gap:12px;padding:10px 18px;background:var(--g-soft);border-bottom:1px solid #cfe5da;color:#14513b}
+.banner svg{color:var(--g)}
+.banner .txt{flex:1;min-width:0}
+.banner b{font-weight:800}
+.banner .btn{height:32px;padding:0 12px;font-size:13px}
+#stage{flex:1;overflow:auto;position:relative}
+.stagein{min-width:100%;min-height:100%;display:flex;align-items:center;justify-content:center;padding:28px}
+.page{position:relative;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.08),0 8px 28px rgba(0,0,0,.08);flex:none;user-select:none}
+.page canvas{position:absolute;inset:0;width:100%;height:100%}
+.layer{position:absolute;inset:0;cursor:crosshair;touch-action:none}
+.box{position:absolute;background:#fff;box-shadow:0 0 0 1.5px rgba(11,122,85,.8);cursor:move}
+.box.linked{box-shadow:0 0 0 1.5px rgba(11,122,85,.8),inset 0 0 0 3px rgba(11,122,85,.08)}
+.box.sel{box-shadow:0 0 0 2px var(--g);z-index:3}
+.clean .box{box-shadow:none}
+.clean .box.sel{box-shadow:0 0 0 2px var(--g)}
+.h{position:absolute;width:12px;height:12px;background:#fff;border:2px solid var(--g);border-radius:3px;display:none}
+.box.sel .h{display:block}
+.h.nw{left:-7px;top:-7px;cursor:nwse-resize}.h.ne{right:-7px;top:-7px;cursor:nesw-resize}
+.h.sw{left:-7px;bottom:-7px;cursor:nesw-resize}.h.se{right:-7px;bottom:-7px;cursor:nwse-resize}
+.tools{position:absolute;left:0;top:calc(100% + 8px);display:none;gap:4px;background:#1f2a25;border-radius:9px;padding:4px;white-space:nowrap;cursor:default}
+.box.sel .tools{display:flex}
+.box.above .tools{top:auto;bottom:calc(100% + 8px)}
+.box.inside .tools{top:6px;left:6px}
+.tools button{border:0;background:transparent;color:#fff;font-size:12.5px;padding:5px 9px;border-radius:6px}
+.tools button:hover{background:rgba(255,255,255,.14)}
+.tools button.del{color:#ffb4ab}
+.draft{position:absolute;background:rgba(255,255,255,.88);box-shadow:0 0 0 2px var(--g);pointer-events:none}
+
+/* floating control bar */
+.dock{position:absolute;left:50%;bottom:18px;transform:translateX(-50%);display:flex;align-items:center;gap:2px;background:rgba(255,255,255,.96);border:1px solid var(--line);border-radius:14px;padding:5px;box-shadow:0 6px 24px rgba(0,0,0,.12);z-index:5}
+.dock button{width:36px;height:34px;border:0;background:transparent;border-radius:9px;display:grid;place-items:center;color:#2d3a33}
+.dock button:hover:not(:disabled){background:#f0f4f2}
+.dock button.on{background:var(--g-soft);color:var(--g)}
+.dock .pg{min-width:66px;text-align:center;font-variant-numeric:tabular-nums;font-weight:700;font-size:13px}
+.dock .zm{min-width:46px;text-align:center;font-variant-numeric:tabular-nums;color:var(--muted);font-size:12.5px}
+.dock i{width:1px;height:20px;background:var(--line);margin:0 4px}
+.stagearea{flex:1;min-height:0;position:relative;display:flex;flex-direction:column}
+
+/* empty */
+#empty{flex:1;display:grid;place-items:center;padding:24px;background:var(--bg)}
+.hero{text-align:center;max-width:560px;width:100%}
+.hero h1{font-size:34px;line-height:1.25;margin:0 0 26px;letter-spacing:-.02em}
+.hero h1 em{font-style:normal;color:var(--g)}
+.drop{border:1.5px dashed #a9c4b7;border-radius:16px;background:#fff;padding:30px 24px;cursor:pointer}
+.drop.over{border-color:var(--g);background:var(--g-soft)}
+.drop .up{width:44px;height:44px;margin:0 auto 10px;border-radius:12px;background:var(--g-soft);color:var(--g);display:grid;place-items:center}
+.drop b{display:block;font-size:16px}
+.drop span{color:var(--muted);font-size:13px}
+.hero .actions{display:flex;gap:8px;justify-content:center;margin-top:16px;flex-wrap:wrap}
+.hero .safe{margin-top:18px;color:var(--faint);font-size:12.5px}
+
+/* setup dialog (HS PDF style) */
+dialog{border:0;padding:0;border-radius:20px;box-shadow:0 20px 60px rgba(0,0,0,.25)}
+dialog::backdrop{background:rgba(30,45,38,.45)}
+#setup{width:min(920px,calc(100% - 32px));max-height:calc(100% - 32px);overflow:hidden}
+#setup[open]{display:flex;flex-direction:column}
+.su{padding:30px 30px 0;overflow:auto;flex:1;min-height:0}
+.su-head{display:flex;justify-content:space-between;align-items:flex-start}
+.su-head h2{margin:0;font-size:22px;letter-spacing:-.01em}
+.x{border:0;background:none;width:36px;height:36px;border-radius:10px;display:grid;place-items:center;color:#2d3a33}
+.x:hover{background:#f0f4f2}
+.shield{width:52px;height:52px;border-radius:14px;background:var(--g-soft);color:var(--g);display:grid;place-items:center;margin:18px 0 14px}
+.shield svg{width:26px;height:26px}
+.lead{color:#4f5d56;margin:0 0 22px;font-size:14px}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.col{border:1px solid var(--line);border-radius:16px;padding:20px;background:#fbfcfb}
+.col-head{display:flex;align-items:center;gap:10px;cursor:pointer}
+.col-head input{width:17px;height:17px;accent-color:var(--g);margin:0}
+.col-head b{font-size:18px}
+.col-head .tag{margin-left:auto;font-size:12.5px;color:var(--muted)}
+.col .sub{margin:6px 0 16px;font-size:12.5px;color:var(--muted)}
+.col h4{margin:16px 0 10px;font-size:13.5px;color:#3c4943}
+.col.off .colbody{opacity:.4;pointer-events:none}
+.card{display:flex;gap:12px;align-items:flex-start;border:1px solid var(--line);border-radius:12px;background:#fff;padding:14px 16px;margin-bottom:10px;cursor:pointer}
+.card:hover{border-color:#b9cdc3}
+.card input{accent-color:var(--g);width:16px;height:16px;margin:2px 0 0}
+.card b{display:block;font-size:15px}
+.card small{display:block;color:var(--muted);font-size:12.5px;margin-top:3px}
+.card:has(input:checked){background:var(--g-soft);border-color:var(--g-line)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:-2px 0 12px 28px}
+.chip{border:1px solid var(--line);background:#fff;border-radius:99px;padding:3px 11px;font-size:12.5px}
+.chip.on{background:var(--g);border-color:var(--g);color:#fff}
+.chip.all{border-style:dashed}
+.fine{font-size:12px;color:var(--muted);margin:4px 0 0}
+textarea{width:100%;min-height:104px;resize:vertical;font:inherit;border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:#fff}
+textarea:focus,.btn:focus-visible,.card:focus-within{outline:2px solid rgba(11,122,85,.35);outline-offset:1px}
+.note{display:flex;gap:10px;align-items:center;margin-top:20px;background:#f2f4f1;border-radius:12px;padding:12px 16px;color:#4f5d56;font-size:13px}
+.su-actions{flex:none;display:flex;justify-content:flex-end;gap:8px;padding:14px 30px 18px;border-top:1px solid var(--line);background:#fff}
+.su-actions .btn{height:44px;padding:0 20px;border-radius:12px}
+
+/* message dialog */
+#dlg{width:min(460px,calc(100% - 32px))}
+.md{padding:24px 24px 18px}
+.md h3{margin:0 0 10px;font-size:17px}
+.md ul{margin:8px 0;padding-left:20px}
+.md .row{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
+.ok{color:var(--g);font-weight:700}
+.bad{color:var(--red);font-weight:700}
+.hint{color:var(--muted);font-size:13px}
+
+#busy{position:fixed;inset:0;background:rgba(30,45,38,.35);display:none;place-items:center;z-index:50}
+#busy.show{display:grid}
+#busy .p{background:#fff;border-radius:14px;padding:20px 24px;min-width:300px}
+.bar{height:8px;background:var(--line);border-radius:99px;overflow:hidden;margin-top:12px}
+.bar i{display:block;height:100%;width:0;background:var(--g);transition:width .15s}
+#toast{position:fixed;left:50%;top:126px;transform:translateX(-50%) translateY(-10px);background:#1f2a25;color:#fff;padding:10px 16px;border-radius:10px;opacity:0;pointer-events:none;transition:.2s;z-index:60;max-width:90vw}
+#toast.show{opacity:1;transform:translateX(-50%)}
+.credit{flex:none;text-align:center;font-size:12px;color:var(--faint);padding:6px 0 8px;background:var(--panel);border-top:1px solid var(--line)}
+@media (max-width:1100px){.hist .btn{padding:0 10px;font-size:13px}}
+@media (max-width:820px){.cols{grid-template-columns:1fr}.rail{display:none}.brand span{display:none}}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l7 3v6c0 4.2-3 7.6-7 9-4-1.4-7-4.8-7-9V6z"/><path d="M8.8 12.2l2.2 2.2 4.3-4.6"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z"/><path d="M14 3v5h5"/></symbol>
+  <symbol id="i-save" viewBox="0 0 24 24"><path d="M5 3h11l3 3v13a2 2 0 01-2 2H7a2 2 0 01-2-2z"/><path d="M8 3v5h7V3M8 21v-6h8v6"/></symbol>
+  <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 010 11H11"/></symbol>
+  <symbol id="i-redo" viewBox="0 0 24 24"><path d="M15 14l5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 000 11H13"/></symbol>
+  <symbol id="i-left" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></symbol>
+  <symbol id="i-right" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></symbol>
+  <symbol id="i-minus" viewBox="0 0 24 24"><path d="M6 12h12"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 6v12M6 12h12"/></symbol>
+  <symbol id="i-fit" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-up" viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5M4 16v3a1 1 0 001 1h14a1 1 0 001-1v-3"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="i-open" viewBox="0 0 24 24"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v1H7l-4 9z"/><path d="M7 10h15l-3 9H3z"/></symbol>
+</svg>
+
+<header>
+  <div class="brand"><div class="logo"><svg class="i"><use href="#i-shield"/></svg></div><span>PDF 이름 가리개</span></div>
+  <button class="btn quiet back" id="backBtn" hidden title="처음 화면으로"><svg class="i"><use href="#i-left"/></svg>뒤로가기</button>
+  <div class="doc" id="doc" hidden><b id="docName"></b><small id="docTarget"></small></div>
+  <div style="flex:1" id="headSpacer"></div>
+  <div class="menu">
+    <button class="btn quiet" id="openBtn"><svg class="i"><use href="#i-open"/></svg>열기</button>
+    <div class="menu-pop" id="openMenu" hidden>
+      <button id="mFolder"><svg class="i"><use href="#i-folder"/></svg><span>폴더 열기<small>저장할 때 같은 폴더에 바로 저장</small></span></button>
+      <button id="mFile"><svg class="i"><use href="#i-file"/></svg><span>파일 하나 열기<small>저장할 때 저장 창이 열림</small></span></button>
+    </div>
+  </div>
+  <div class="hist" id="hist" hidden>
+    <button class="btn" id="undo" title="되돌리기 (Ctrl+Z)"><svg class="i"><use href="#i-undo"/></svg>되돌리기</button>
+    <button class="btn" id="redo" title="다시 실행 (Ctrl+Y)"><svg class="i"><use href="#i-redo"/></svg>다시 실행</button>
+  </div>
+  <button class="btn" id="setupBtn" disabled><svg class="i"><use href="#i-shield"/></svg>가리기 설정</button>
+  <button class="btn primary" id="saveBtn" disabled><svg class="i"><use href="#i-save"/></svg>저장</button>
+</header>
+
+<div class="work">
+  <div id="empty">
+    <div class="hero">
+      <h1>학생 이름,<br><em>흰색으로 깔끔하게 가리기.</em></h1>
+      <div class="drop" id="drop">
+        <div class="up"><svg class="i"><use href="#i-up"/></svg></div>
+        <b>PDF 파일을 여기에 놓아 주세요</b>
+        <span>또는 아래에서 폴더나 파일을 여세요</span>
+      </div>
+      <div class="actions">
+        <button class="btn primary" id="eFolder"><svg class="i"><use href="#i-folder"/></svg>폴더 열기 (권장)</button>
+        <button class="btn" id="eFile"><svg class="i"><use href="#i-file"/></svg>파일 하나 열기</button>
+        <button class="btn" id="reopen" hidden></button>
+      </div>
+      <div class="safe"><svg class="i" style="width:14px;height:14px;vertical-align:-2px"><use href="#i-lock"/></svg> 파일을 서버에 올리지 않습니다. 저장하면 원본 옆에 <b>파일명_가림.pdf</b>로 저장됩니다.</div>
+    </div>
+  </div>
+
+  <nav class="rail" id="rail" hidden></nav>
+  <div class="stagewrap" id="workArea" hidden>
+    <div class="banner" id="banner">
+      <svg class="i"><use href="#i-shield"/></svg>
+      <div class="txt" id="bannerTxt"></div>
+      <button class="btn" id="bannerSetup">설정 변경</button>
+    </div>
+    <div class="stagearea">
+      <div id="stage"><div class="stagein"><div class="page" id="page"><canvas id="canvas"></canvas><div class="layer" id="layer"></div></div></div></div>
+      <div class="dock">
+        <button id="prev" title="이전 쪽 (←)"><svg class="i"><use href="#i-left"/></svg></button>
+        <span class="pg" id="pg">1 / 1</span>
+        <button id="next" title="다음 쪽 (→)"><svg class="i"><use href="#i-right"/></svg></button>
+        <i></i>
+        <button id="zoomOut" title="축소"><svg class="i"><use href="#i-minus"/></svg></button>
+        <span class="zm" id="zm">100%</span>
+        <button id="zoomIn" title="확대"><svg class="i"><use href="#i-plus"/></svg></button>
+        <button id="zoomFit" title="화면에 맞춤"><svg class="i"><use href="#i-fit"/></svg></button>
+        <i></i>
+        <button id="clean" title="점선 없이 저장될 모습 보기"><svg class="i"><use href="#i-eye"/></svg></button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<footer class="credit">서울송정초등학교 이경미</footer>
+
+<dialog id="setup">
+  <div class="su">
+    <div class="su-head"><h2>개인정보 가리기</h2><button class="x" id="suClose" title="닫기"><svg class="i"><use href="#i-close"/></svg></button></div>
+    <div class="shield"><svg class="i"><use href="#i-shield"/></svg></div>
+    <p class="lead">지정한 영역이나 찾은 이름을 흰색으로 가립니다. 안전한 공유를 위해 저장할 때 문서 전체를 새 이미지 PDF로 만듭니다. 저장한 파일에서는 원래 글자를 검색하거나 복사할 수 없습니다.</p>
+    <div class="cols">
+      <section class="col" id="colArea">
+        <label class="col-head"><input type="checkbox" id="useArea" checked><b>영역 관리</b><span class="tag">기본값</span></label>
+        <div class="colbody">
+          <p class="sub">드래그한 영역을 흰색으로 가립니다.</p>
+          <h4>영역 작업 방식</h4>
+          <label class="card"><input type="radio" name="mode" value="single"><span><b>선택한 페이지</b><small>지금 보고 있는 한 페이지에 직접 영역 지정</small></span></label>
+          <label class="card"><input type="radio" name="mode" value="multi"><span><b>여러 페이지</b><small>페이지를 넘기며 각 페이지에 수작업으로 영역 지정</small></span></label>
+          <label class="card"><input type="radio" name="mode" value="repeat" checked><span><b>반복 페이지</b><small>한 번 지정한 영역을 여러 페이지의 같은 위치에 자동 적용</small></span></label>
+          <div id="repeatOpts">
+            <h4>같은 위치를 반복 적용할 페이지</h4>
+            <label class="card"><input type="radio" name="rscope" value="selected"><span><b id="rSelLabel">선택한 페이지</b><small>아래에서 여러 페이지를 선택하면 같은 위치를 선택한 페이지마다 가립니다.</small></span></label>
+            <div class="chips" id="rChips"></div>
+            <label class="card"><input type="radio" name="rscope" value="all" checked><span><b id="rAllLabel">전체 페이지</b><small>문서의 모든 페이지에서 같은 위치를 가립니다.</small></span></label>
+            <p class="fine">같은 서식의 페이지에 사용하세요. 크기가 다르면 같은 비율의 위치에 적용됩니다. 저장 전 가린 위치를 확인하세요.</p>
+          </div>
+        </div>
+      </section>
+      <section class="col off" id="colFind">
+        <label class="col-head"><input type="checkbox" id="useFind"><b>이름으로 찾기</b></label>
+        <div class="colbody">
+          <p class="sub">PDF 안의 글자에서 이름을 찾아 흰색으로 가립니다.</p>
+          <h4>이름을 찾을 페이지</h4>
+          <label class="card"><input type="radio" name="fscope" value="current"><span><b id="fCurLabel">현재 페이지</b><small>지금 보고 있는 한 페이지에서만 찾습니다.</small></span></label>
+          <label class="card"><input type="radio" name="fscope" value="selected"><span><b id="fSelLabel">선택한 페이지</b><small>아래에서 고른 페이지에서 찾습니다.</small></span></label>
+          <div class="chips" id="fChips"></div>
+          <label class="card"><input type="radio" name="fscope" value="all" checked><span><b id="fAllLabel">전체 페이지</b><small>문서의 모든 페이지에서 찾습니다.</small></span></label>
+          <h4>가릴 이름 · 줄바꿈 또는 쉼표로 구분</h4>
+          <textarea id="terms" placeholder="홍길동&#10;김철수&#10;이영희"></textarea>
+          <p class="fine">엑셀 명렬표의 이름 열을 그대로 붙여 넣어도 됩니다. 스캔한 PDF에서는 찾을 수 없으니 영역 관리를 쓰세요.</p>
+        </div>
+      </section>
+    </div>
+    <div class="note"><svg class="i"><use href="#i-lock"/></svg>원본 파일은 그대로 유지됩니다. 공유할 때는 새로 저장한 <b>_가림</b> 파일을 사용하세요.</div>
+    <div style="height:22px"></div>
+  </div>
+  <div class="su-actions">
+    <button class="btn quiet" id="suCancel">취소</button>
+    <button class="btn primary" id="suStart"><svg class="i"><use href="#i-shield"/></svg><span id="suStartLabel">영역 지정</span></button>
+  </div>
+</dialog>
+
+<dialog id="dlg"><div class="md"><h3 id="dlgTitle"></h3><div id="dlgBody"></div><div class="row" id="dlgRow"></div></div></dialog>
+<div id="busy"><div class="p"><b id="busyText">처리 중…</b><div class="bar"><i id="busyBar"></i></div></div></div>
+<div id="toast"></div>
+<input type="file" id="fileInput" accept="application/pdf,.pdf" hidden>
+
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/legacy/build/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/legacy/build/pdf.worker.min.js"></script>
+<script>
+"use strict";
+(() => {
+const pdfjsLib = window.pdfjsLib;
+const { PDFDocument } = window.PDFLib;
+// The PDF engine runs inside the page (window.pdfjsWorker is loaded above), so it
+// works even where background workers and blob scripts are blocked (previews, sandboxes).
+if (!window.pdfjsWorker) throw new Error("PDF 엔진을 불러오지 못했습니다.");
+const CDN = "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/";
+const LOAD_OPTS = { isEvalSupported: false, cMapUrl: CDN + "cmaps/", cMapPacked: true, standardFontDataUrl: CDN + "standard_fonts/" };
+
+const $ = (id) => document.getElementById(id);
+const stage = $("stage"), pageEl = $("page"), canvas = $("canvas"), layer = $("layer");
+
+const state = {
+  doc: null, name: "", fileHandle: null, dirHandle: null,
+  pages: [],            // {num, w, h, boxes:[{id, gid?, x, y, w, h}], thumb}
+  cur: 0,
+  zoom: 1,              // relative to fit
+  sel: null,            // box id on current page
+  undo: [], redo: [], dirty: false, clean: false,
+  setup: { area: true, mode: "repeat", rscope: "all", rpages: new Set(), find: false, fscope: "all", fpages: new Set(), terms: "" },
+};
+let uidN = 0;
+const uid = () => "b" + ++uidN;
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const outName = (n) => n.replace(/\.pdf$/i, "") + "_가림.pdf";
+const pageList = (set) => [...set].sort((a, b) => a - b).map((i) => i + 1).join(", ");
+
+/* ---------- small UI ---------- */
+function toast(msg, ms = 2600) {
+  const t = $("toast"); t.textContent = msg; t.classList.add("show");
+  clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove("show"), ms);
+}
+function busy(text, r) {
+  if (text === false) return $("busy").classList.remove("show");
+  $("busyText").textContent = text; $("busyBar").style.width = Math.round((r || 0) * 100) + "%";
+  $("busy").classList.add("show");
+}
+function dialog(title, html, buttons) {
+  return new Promise((resolve) => {
+    const d = $("dlg");
+    $("dlgTitle").textContent = title; $("dlgBody").innerHTML = html;
+    const row = $("dlgRow"); row.innerHTML = "";
+    for (const [label, value, cls] of buttons) {
+      const b = document.createElement("button");
+      b.className = "btn " + (cls || ""); b.textContent = label;
+      b.onclick = () => { d.close(); resolve(value); };
+      row.appendChild(b);
+    }
+    d.oncancel = () => resolve(null);
+    d.showModal(); row.lastChild?.focus();
+  });
+}
+
+/* ---------- opening ---------- */
+async function confirmDiscard() {
+  if (!state.dirty) return true;
+  return !!(await dialog("저장하지 않은 가림이 있습니다", "다른 파일을 열면 지금 작업한 가림이 사라집니다.", [["취소", false], ["버리고 열기", true, "primary"]]));
+}
+async function openFolder() {
+  if (!(await confirmDiscard())) return;
+  if (!("showDirectoryPicker" in window))
+    return dialog("폴더 열기를 쓸 수 없습니다", "크롬(Chrome)이나 엣지(Edge)에서 이 파일을 직접 열어 주세요. 지금은 <b>파일 하나 열기</b>를 쓸 수 있습니다.", [["확인", true, "primary"]]);
+  let dir;
+  try { dir = await window.showDirectoryPicker({ id: "garim", mode: "readwrite" }); }
+  catch (e) {
+    if (e.name !== "AbortError") dialog("폴더를 열 수 없습니다", "이 화면에서는 폴더 접근이 막혀 있습니다.<br>내려받은 HTML 파일을 <b>크롬/엣지로 직접 열어</b> 사용해 주세요.", [["확인", true, "primary"]]);
+    return;
+  }
+  useFolder(dir);
+}
+async function listPdfs(dir) {
+  const names = [];
+  for await (const [n, h] of dir.entries()) if (h.kind === "file" && /\.pdf$/i.test(n)) names.push(n);
+  return names.sort((a, b) => a.localeCompare(b, "ko", { numeric: true }));
+}
+async function useFolder(dir) {
+  state.dirHandle = dir;
+  try { const db = await idb(); db.transaction("kv", "readwrite").objectStore("kv").put(dir, "folder"); } catch {}
+  const names = await listPdfs(dir);
+  const originals = names.filter((n) => !/_가림\.pdf$/i.test(n));
+  if (!names.length) return dialog("PDF가 없습니다", `'${esc(dir.name)}' 폴더에 PDF 파일이 없습니다.`, [["확인", true, "primary"]]);
+  if (originals.length === 1) return openFromFolder(originals[0]);
+  const pick = await dialog(`'${dir.name}' 폴더의 PDF`,
+    `<p class="hint" style="margin:0 0 8px">가릴 파일을 고르세요. 저장하면 이 폴더에 <b>_가림</b> 파일이 생깁니다.</p>
+     <div style="max-height:300px;overflow:auto;border:1px solid var(--line);border-radius:12px">${names.map((n, i) =>
+      `<button class="btn quiet" data-i="${i}" style="width:100%;justify-content:flex-start;border-radius:0;color:var(--ink);font-weight:500;border-bottom:1px solid var(--line)">${esc(n)}${/_가림\.pdf$/i.test(n) ? ' <span class="hint">(가림 완료본)</span>' : ""}</button>`).join("")}</div>`,
+    [["취소", null]]);
+  void pick;
+}
+$("dlgBody").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-i]");
+  if (!b || !state.dirHandle) return;
+  $("dlg").close();
+  listPdfs(state.dirHandle).then((names) => openFromFolder(names[+b.dataset.i]));
+});
+async function openFromFolder(name) {
+  const h = await state.dirHandle.getFileHandle(name);
+  loadFile(await h.getFile(), h, state.dirHandle);
+}
+async function openFile() {
+  if (!(await confirmDiscard())) return;
+  if ("showOpenFilePicker" in window) {
+    try {
+      const [h] = await window.showOpenFilePicker({ id: "garim", types: [{ description: "PDF", accept: { "application/pdf": [".pdf"] } }] });
+      return loadFile(await h.getFile(), h, null);
+    } catch (e) { if (e.name === "AbortError") return; }
+  }
+  $("fileInput").value = ""; $("fileInput").click();
+}
+$("fileInput").onchange = (e) => { const f = e.target.files[0]; if (f) loadFile(f, null, null); };
+
+async function loadFile(file, handle, dir) {
+  if (!/\.pdf$/i.test(file.name) && file.type !== "application/pdf") return toast("PDF 파일만 열 수 있습니다.");
+  busy("PDF를 여는 중…", 0.2);
+  try {
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const doc = await pdfjsLib.getDocument({ ...LOAD_OPTS, data: bytes }).promise;
+    state.doc?.destroy();
+    const pages = [];
+    for (let n = 1; n <= doc.numPages; n++) {
+      const vp = (await doc.getPage(n)).getViewport({ scale: 1 });
+      pages.push({ num: n, w: vp.width, h: vp.height, boxes: [] });
+    }
+    Object.assign(state, { doc, name: file.name, fileHandle: handle, dirHandle: dir, pages, cur: 0, zoom: 1, sel: null, undo: [], redo: [], dirty: false, clean: false });
+    state.setup.rpages = new Set([0]); state.setup.fpages = new Set([0]);
+    $("empty").hidden = true; $("rail").hidden = false; $("workArea").hidden = false; $("doc").hidden = false; $("headSpacer").hidden = true;
+    buildRail();
+    showPage(0);
+    busy(false);
+    openSetup();
+  } catch (e) {
+    busy(false); console.error(e);
+    dialog("PDF를 열 수 없습니다", e?.name === "PasswordException" ? "암호가 걸린 PDF입니다. 암호를 풀고 다시 열어 주세요." : "파일이 손상되었거나 PDF가 아닙니다.<br><small class='hint'>" + esc(e.message || e) + "</small>", [["확인", true, "primary"]]);
+  }
+}
+
+/* ---------- page view ---------- */
+let renderTask = null, renderSeq = 0;
+function fitScale(pg) {
+  const W = stage.clientWidth - 56, H = stage.clientHeight - 56 - 60; // leave room for the dock
+  return Math.max(0.1, Math.min(W / pg.w, H / pg.h));
+}
+function layout() {
+  const pg = state.pages[state.cur];
+  if (!pg) return;
+  const s = fitScale(pg) * state.zoom;
+  pageEl.style.width = pg.w * s + "px";
+  pageEl.style.height = pg.h * s + "px";
+  $("zm").textContent = Math.round(state.zoom * 100) + "%";
+  render(s);
+}
+async function render(s) {
+  const pg = state.pages[state.cur];
+  const seq = ++renderSeq;
+  try {
+    renderTask?.cancel();
+    const page = await state.doc.getPage(pg.num);
+    if (seq !== renderSeq) return;
+    const vp = page.getViewport({ scale: s * (window.devicePixelRatio || 1) });
+    const off = document.createElement("canvas");
+    off.width = Math.ceil(vp.width); off.height = Math.ceil(vp.height);
+    renderTask = page.render({ canvasContext: off.getContext("2d"), viewport: vp, background: "#ffffff" });
+    await renderTask.promise;
+    if (seq !== renderSeq) return;
+    canvas.width = off.width; canvas.height = off.height;
+    canvas.getContext("2d").drawImage(off, 0, 0);
+  } catch (e) { if (e?.name !== "RenderingCancelledException") console.error(e); }
+}
+function showPage(i) {
+  state.cur = clamp(i, 0, state.pages.length - 1);
+  state.sel = null;
+  canvas.width = canvas.height = 1;
+  layout();
+  drawBoxes();
+  updateUI();
+  const t = $("rail").children[state.cur];
+  t?.scrollIntoView({ block: "nearest" });
+}
+new ResizeObserver(() => { if (state.doc) layout(); }).observe(stage);
+stage.addEventListener("wheel", (e) => {
+  if (!e.ctrlKey || !state.doc) return;
+  e.preventDefault();
+  state.zoom = clamp(state.zoom * (e.deltaY < 0 ? 1.1 : 1 / 1.1), 0.5, 4);
+  layout();
+}, { passive: false });
+
+/* thumbnails */
+let thumbObs;
+function buildRail() {
+  const rail = $("rail");
+  rail.innerHTML = "";
+  thumbObs?.disconnect();
+  thumbObs = new IntersectionObserver((ents) => ents.forEach((en) => { if (en.isIntersecting) renderThumb(+en.target.dataset.i); }), { root: rail, rootMargin: "300px" });
+  state.pages.forEach((pg, i) => {
+    const b = document.createElement("button");
+    b.className = "thumb"; b.dataset.i = i;
+    const w = 92, h = (pg.h / pg.w) * w;
+    b.innerHTML = `<div class="tp" style="width:${w}px;height:${h}px"><canvas></canvas><div class="tbs"></div></div><div class="tl">${i + 1}<span class="cnt zero">0</span></div>`;
+    b.onclick = () => showPage(i);
+    rail.appendChild(b);
+    thumbObs.observe(b);
+  });
+}
+async function renderThumb(i) {
+  const pg = state.pages[i];
+  if (pg.thumbDone) return;
+  pg.thumbDone = true;
+  const page = await state.doc.getPage(pg.num);
+  const c = $("rail").children[i].querySelector("canvas");
+  const vp = page.getViewport({ scale: (92 / pg.w) * 2 });
+  c.width = vp.width; c.height = vp.height;
+  await page.render({ canvasContext: c.getContext("2d"), viewport: vp, background: "#ffffff" }).promise;
+}
+function updateThumbs() {
+  [...$("rail").children].forEach((t, i) => {
+    const pg = state.pages[i];
+    t.classList.toggle("cur", i === state.cur);
+    t.querySelector(".tbs").innerHTML = pg.boxes.map((b) => `<div class="tb" style="left:${b.x * 100}%;top:${b.y * 100}%;width:${b.w * 100}%;height:${b.h * 100}%"></div>`).join("");
+    const c = t.querySelector(".cnt");
+    c.textContent = pg.boxes.length; c.classList.toggle("zero", !pg.boxes.length);
+  });
+}
+
+/* ---------- boxes ---------- */
+const snapshot = () => state.pages.map((p) => p.boxes.map((b) => ({ ...b })));
+function commit(before) {
+  state.undo.push(before); if (state.undo.length > 100) state.undo.shift();
+  state.redo = []; state.dirty = true; updateUI();
+}
+function restore(snap) {
+  snap.forEach((bs, i) => (state.pages[i].boxes = bs.map((b) => ({ ...b }))));
+  state.sel = null; state.dirty = true; drawBoxes(); updateUI();
+}
+const undo = () => { if (state.undo.length) { state.redo.push(snapshot()); restore(state.undo.pop()); } };
+const redo = () => { if (state.redo.length) { state.undo.push(snapshot()); restore(state.redo.pop()); } };
+const curBoxes = () => state.pages[state.cur].boxes;
+const groupCount = (gid) => state.pages.filter((p) => p.boxes.some((b) => b.gid === gid)).length;
+
+function drawBoxes() {
+  layer.querySelectorAll(".box").forEach((n) => n.remove());
+  for (const b of curBoxes()) {
+    const el = document.createElement("div");
+    el.className = "box" + (b.gid ? " linked" : "") + (b.id === state.sel ? " sel" : "") + (b.y + b.h > 0.93 ? (b.y > 0.07 ? " above" : " inside") : "");
+    el.dataset.id = b.id;
+    Object.assign(el.style, { left: b.x * 100 + "%", top: b.y * 100 + "%", width: b.w * 100 + "%", height: b.h * 100 + "%" });
+    const n = b.gid ? groupCount(b.gid) : 1;
+    el.innerHTML = '<i class="h nw"></i><i class="h ne"></i><i class="h sw"></i><i class="h se"></i><div class="tools">' +
+      (n > 1 ? `<button data-act="one">이 쪽만 삭제</button><button data-act="all" class="del">${n}쪽 모두 삭제</button>` : '<button data-act="one" class="del">삭제</button>') + "</div>";
+    layer.appendChild(el);
+  }
+  updateThumbs();
+}
+function deleteBox(id, all) {
+  const b = curBoxes().find((x) => x.id === id);
+  if (!b) return;
+  const before = snapshot();
+  if (all && b.gid) state.pages.forEach((p) => (p.boxes = p.boxes.filter((x) => x.gid !== b.gid)));
+  else state.pages[state.cur].boxes = curBoxes().filter((x) => x.id !== id);
+  state.sel = null; drawBoxes(); commit(before);
+}
+// Pages a newly drawn box should land on.
+function targetPages() {
+  const s = state.setup;
+  if (!s.area || s.mode !== "repeat") return [state.cur];
+  if (s.rscope === "all") return state.pages.map((_, i) => i);
+  const set = new Set(s.rpages); set.add(state.cur);
+  return [...set].sort((a, b) => a - b);
+}
+function syncGroup(b) {
+  if (!b.gid) return;
+  for (const p of state.pages) for (const o of p.boxes) if (o.gid === b.gid && o !== b) Object.assign(o, { x: b.x, y: b.y, w: b.w, h: b.h });
+}
+
+{
+  let op = null;
+  const pos = (e) => { const r = layer.getBoundingClientRect(); return { x: clamp((e.clientX - r.left) / r.width, 0, 1), y: clamp((e.clientY - r.top) / r.height, 0, 1) }; };
+  layer.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0) return;
+    const act = e.target.closest("[data-act]");
+    if (act) { deleteBox(e.target.closest(".box").dataset.id, act.dataset.act === "all"); e.preventDefault(); return; }
+    if (e.target.closest(".tools")) return;
+    const p = pos(e);
+    const boxEl = e.target.closest(".box");
+    layer.setPointerCapture(e.pointerId);
+    if (boxEl) {
+      const b = curBoxes().find((x) => x.id === boxEl.dataset.id);
+      if (state.sel !== b.id) { state.sel = b.id; drawBoxes(); }
+      const handle = e.target.classList.contains("h") ? [...e.target.classList].find((c) => c.length === 2) : null;
+      op = { kind: handle ? "resize" : "move", handle, b, start: p, orig: { ...b }, before: snapshot(), changed: false };
+    } else {
+      if (state.sel) { state.sel = null; drawBoxes(); }
+      const d = document.createElement("div"); d.className = "draft"; layer.appendChild(d);
+      op = { kind: "draw", start: p, cur: p, el: d };
+    }
+    e.preventDefault();
+  });
+  layer.addEventListener("pointermove", (e) => {
+    if (!op) return;
+    const p = pos(e);
+    if (op.kind === "draw") {
+      op.cur = p;
+      Object.assign(op.el.style, { left: Math.min(p.x, op.start.x) * 100 + "%", top: Math.min(p.y, op.start.y) * 100 + "%", width: Math.abs(p.x - op.start.x) * 100 + "%", height: Math.abs(p.y - op.start.y) * 100 + "%" });
+      return;
+    }
+    const dx = p.x - op.start.x, dy = p.y - op.start.y, o = op.orig, b = op.b;
+    if (op.kind === "move") { b.x = clamp(o.x + dx, 0, 1 - o.w); b.y = clamp(o.y + dy, 0, 1 - o.h); }
+    else {
+      let x1 = o.x, y1 = o.y, x2 = o.x + o.w, y2 = o.y + o.h;
+      if (op.handle.includes("w")) x1 = clamp(o.x + dx, 0, x2 - 0.003);
+      if (op.handle.includes("e")) x2 = clamp(x2 + dx, x1 + 0.003, 1);
+      if (op.handle.includes("n")) y1 = clamp(o.y + dy, 0, y2 - 0.003);
+      if (op.handle.includes("s")) y2 = clamp(y2 + dy, y1 + 0.003, 1);
+      Object.assign(b, { x: x1, y: y1, w: x2 - x1, h: y2 - y1 });
+    }
+    op.changed = true;
+    const el = layer.querySelector(`.box[data-id="${b.id}"]`);
+    Object.assign(el.style, { left: b.x * 100 + "%", top: b.y * 100 + "%", width: b.w * 100 + "%", height: b.h * 100 + "%" });
+  });
+  const end = () => {
+    if (!op) return;
+    if (op.kind === "draw") {
+      op.el.remove();
+      const r = layer.getBoundingClientRect();
+      const w = Math.abs(op.cur.x - op.start.x), h = Math.abs(op.cur.y - op.start.y);
+      if (w * r.width >= 4 && h * r.height >= 4) {
+        const before = snapshot();
+        const geo = { x: Math.min(op.start.x, op.cur.x), y: Math.min(op.start.y, op.cur.y), w, h };
+        const targets = targetPages();
+        const gid = targets.length > 1 ? uid() : undefined;
+        for (const i of targets) {
+          const nb = { id: uid(), gid, ...geo };
+          state.pages[i].boxes.push(nb);
+          if (i === state.cur) state.sel = nb.id;
+        }
+        drawBoxes(); commit(before);
+        if (targets.length > 1) toast(`${targets.length}쪽의 같은 위치에 가림을 적용했습니다.`);
+      }
+    } else if (op.changed) {
+      syncGroup(op.b); drawBoxes(); commit(op.before);
+    }
+    op = null;
+  };
+  layer.addEventListener("pointerup", end);
+  layer.addEventListener("pointercancel", end);
+}
+
+/* ---------- setup dialog ---------- */
+function chips(el, set, onChange) {
+  el.innerHTML = state.pages.map((_, i) => `<button type="button" class="chip${set.has(i) ? " on" : ""}" data-i="${i}">${i + 1}쪽</button>`).join("") +
+    '<button type="button" class="chip all" data-i="all">모두</button>';
+  el.onclick = (e) => {
+    const b = e.target.closest(".chip"); if (!b) return;
+    if (b.dataset.i === "all") { if (set.size === state.pages.length) { set.clear(); set.add(state.cur); } else state.pages.forEach((_, i) => set.add(i)); }
+    else { const i = +b.dataset.i; set.has(i) ? set.delete(i) : set.add(i); if (!set.size) set.add(i); }
+    chips(el, set, onChange); onChange();
+  };
+}
+function refreshSetup() {
+  const s = state.setup, n = state.pages.length;
+  s.area = $("useArea").checked; s.find = $("useFind").checked;
+  s.mode = document.querySelector("input[name=mode]:checked").value;
+  s.rscope = document.querySelector("input[name=rscope]:checked").value;
+  s.fscope = document.querySelector("input[name=fscope]:checked").value;
+  $("colArea").classList.toggle("off", !s.area);
+  $("colFind").classList.toggle("off", !s.find);
+  $("repeatOpts").hidden = s.mode !== "repeat";
+  $("rChips").hidden = s.rscope !== "selected";
+  $("fChips").hidden = s.fscope !== "selected";
+  $("rSelLabel").textContent = `선택한 페이지 (${s.rpages.size}쪽 선택)`;
+  $("rAllLabel").textContent = `전체 페이지 (${n}쪽)`;
+  $("fCurLabel").textContent = `현재 페이지 (${state.cur + 1}쪽)`;
+  $("fSelLabel").textContent = `선택한 페이지 (${s.fpages.size}쪽 선택)`;
+  $("fAllLabel").textContent = `전체 페이지 (${n}쪽)`;
+  $("suStartLabel").textContent = s.find && s.area ? "이름 찾고 영역 지정" : s.find ? "이름 찾아 가리기" : "영역 지정";
+  $("suStart").disabled = !s.area && !s.find;
+}
+function openSetup() {
+  const s = state.setup;
+  $("useArea").checked = s.area; $("useFind").checked = s.find;
+  document.querySelector(`input[name=mode][value=${s.mode}]`).checked = true;
+  document.querySelector(`input[name=rscope][value=${s.rscope}]`).checked = true;
+  document.querySelector(`input[name=fscope][value=${s.fscope}]`).checked = true;
+  $("terms").value = s.terms;
+  chips($("rChips"), s.rpages, refreshSetup);
+  chips($("fChips"), s.fpages, refreshSetup);
+  refreshSetup();
+  $("setup").showModal();
+}
+$("setup").addEventListener("change", refreshSetup);
+$("suClose").onclick = $("suCancel").onclick = () => $("setup").close();
+$("suStart").onclick = async () => {
+  refreshSetup();
+  const s = state.setup;
+  s.terms = $("terms").value;
+  if (s.find && !s.terms.trim()) { $("terms").focus(); return toast("가릴 이름을 입력해 주세요."); }
+  $("setup").close();
+  updateUI();
+  if (s.find) await findNames();
+  if (s.area) toast(bannerText(true), 3200);
+};
+function bannerText(plain) {
+  const s = state.setup, n = state.pages.length;
+  let t;
+  if (!s.area) t = "<b>이름으로 찾기</b> · 찾은 곳을 확인하세요. 빠진 곳은 직접 드래그해 가릴 수 있습니다.";
+  else if (s.mode === "single") t = `<b>선택한 페이지</b> · 지금 보는 ${state.cur + 1}쪽에 드래그해서 가리세요.`;
+  else if (s.mode === "multi") t = "<b>여러 페이지</b> · 쪽을 넘기며 쪽마다 드래그해서 가리세요.";
+  else if (s.rscope === "all") t = `<b>반복 페이지</b> · 드래그하면 전체 ${n}쪽의 같은 위치가 함께 가려집니다.`;
+  else { const set = new Set(s.rpages); set.add(state.cur); t = `<b>반복 페이지</b> · 드래그하면 ${pageList(set)}쪽의 같은 위치가 함께 가려집니다.`; }
+  return plain ? t.replace(/<[^>]+>/g, "") : t;
+}
+
+/* ---------- find names (PDF text layer) ---------- */
+const squash = (s) => s.normalize("NFKC").replace(/\s+/g, "").toLowerCase();
+async function pageChars(pg) {
+  const page = await state.doc.getPage(pg.num);
+  const vp = page.getViewport({ scale: 1 });
+  const tc = await page.getTextContent();
+  const chars = [];
+  let prevEnd = null;
+  for (const item of tc.items) {
+    if (!item.str) continue;
+    const t = pdfjsLib.Util.transform(vp.transform, item.transform);
+    const fh = Math.hypot(t[2], t[3]) || 1, fw = Math.hypot(t[0], t[1]) || 1;
+    const dir = [t[0] / fw, t[1] / fw], up = [t[2], t[3]];
+    const total = item.width * vp.scale || fw * item.str.length * 0.5;
+    const start = [t[4], t[5]];
+    if (prevEnd && Math.hypot(start[0] - prevEnd[0], start[1] - prevEnd[1]) > fh * 0.9) chars.push(null);
+    const str = [...item.str];
+    str.forEach((ch, i) => {
+      const pts = [];
+      for (const along of [total * (i / str.length), total * ((i + 1) / str.length)])
+        for (const k of [-0.28, 1.0]) pts.push([start[0] + dir[0] * along + up[0] * k, start[1] + dir[1] * along + up[1] * k]);
+      const xs = pts.map((q) => q[0]), ys = pts.map((q) => q[1]);
+      chars.push({ ch, x1: Math.min(...xs), y1: Math.min(...ys), x2: Math.max(...xs), y2: Math.max(...ys) });
+    });
+    prevEnd = [start[0] + dir[0] * total, start[1] + dir[1] * total];
+    if (item.hasEOL) { chars.push(null); prevEnd = null; }
+  }
+  return { chars, vp };
+}
+async function findNames() {
+  const s = state.setup;
+  const terms = [...new Set(s.terms.split(/[,\n\t;/ ]+/).map((t) => t.trim()).filter(Boolean))];
+  const short = terms.filter((t) => squash(t).length < 2);
+  const list = terms.filter((t) => squash(t).length >= 2).sort((a, b) => squash(b).length - squash(a).length);
+  if (!list.length) return dialog("찾을 이름이 없습니다", "한 글자는 너무 많은 곳을 지우므로 두 글자 이상 입력해 주세요.", [["확인", true, "primary"]]);
+  const scope = s.fscope === "current" ? [state.cur] : s.fscope === "selected" ? [...s.fpages].sort((a, b) => a - b) : state.pages.map((_, i) => i);
+  const before = snapshot();
+  const counts = new Map(list.map((t) => [t, 0]));
+  let anyText = false, added = 0;
+  for (const [k, i] of scope.entries()) {
+    busy(`이름을 찾는 중… (${k + 1}/${scope.length}쪽)`, (k + 1) / scope.length);
+    const pg = state.pages[i];
+    const { chars, vp } = await pageChars(pg);
+    let text = ""; const map = [];
+    for (const c of chars) {
+      if (!c) { text += "\u0000"; map.push(null); continue; }
+      const q = squash(c.ch); if (!q) continue;
+      anyText = true;
+      for (const ch of q) { text += ch; map.push(c); }
+    }
+    const used = new Set();
+    for (const term of list) {
+      const needle = squash(term);
+      let at = 0;
+      while ((at = text.indexOf(needle, at)) !== -1) {
+        const idx = [...Array(needle.length).keys()].map((j) => at + j);
+        if (!idx.some((j) => used.has(j))) {
+          idx.forEach((j) => used.add(j));
+          counts.set(term, counts.get(term) + 1);
+          const segs = [];
+          for (const j of idx) {
+            const c = map[j], last = segs[segs.length - 1], cy = (c.y1 + c.y2) / 2;
+            if (last && Math.abs(cy - last.cy) < (c.y2 - c.y1) * 0.5) { last.x1 = Math.min(last.x1, c.x1); last.y1 = Math.min(last.y1, c.y1); last.x2 = Math.max(last.x2, c.x2); last.y2 = Math.max(last.y2, c.y2); }
+            else segs.push({ ...c, cy });
+          }
+          for (const g of segs) {
+            const pad = Math.max(1.5, (g.y2 - g.y1) * 0.12);
+            const x = Math.max(0, g.x1 - pad), y = Math.max(0, g.y1 - pad);
+            const box = { id: uid(), x: x / vp.width, y: y / vp.height, w: (Math.min(vp.width, g.x2 + pad) - x) / vp.width, h: (Math.min(vp.height, g.y2 + pad) - y) / vp.height };
+            const inside = pg.boxes.some((c) => c.x <= box.x + 1e-4 && c.y <= box.y + 1e-4 && c.x + c.w >= box.x + box.w - 1e-4 && c.y + c.h >= box.y + box.h - 1e-4);
+            if (!inside) { pg.boxes.push(box); added++; }
+          }
+        }
+        at += needle.length;
+      }
+    }
+  }
+  busy(false);
+  drawBoxes();
+  if (added) commit(before);
+  const found = list.filter((t) => counts.get(t)), missed = list.filter((t) => !counts.get(t));
+  if (!anyText) return dialog("글자 정보가 없는 PDF입니다", "스캔본이거나 그림으로 된 PDF라서 이름을 찾을 수 없습니다.<br><b>영역 관리</b>로 직접 드래그해서 가려 주세요.", [["확인", true, "primary"]]);
+  dialog(missed.length ? "일부 이름을 찾지 못했습니다" : "✓ 이름을 모두 찾았습니다",
+    `<ul><li class="ok">찾은 이름 ${found.length}명 · 새로 가린 곳 ${added}곳</li>` +
+    (missed.length ? `<li class="bad">찾지 못함: ${missed.map(esc).join(", ")}</li>` : "") +
+    (short.length ? `<li class="hint">한 글자라서 건너뜀: ${short.map(esc).join(", ")}</li>` : "") +
+    `</ul><p class="hint">왼쪽 미리보기의 숫자는 쪽마다 가린 곳의 수입니다. ${missed.length ? "찾지 못한 이름은 문서에서 직접 확인해 드래그해 주세요." : "저장 전에 쪽마다 한 번씩 확인해 주세요."}</p>`,
+    [["확인", true, "primary"]]);
+}
+
+/* ---------- pre-save checks ---------- */
+async function preSaveCheck() {
+  const partial = [], candidates = [];
+  const boxed = state.pages.filter((p) => p.boxes.length);
+  for (const pg of boxed) {
+    const i = state.pages.indexOf(pg);
+    const { chars, vp } = await pageChars(pg);
+    const boxes = pg.boxes.map((b) => ({ x1: b.x * vp.width, y1: b.y * vp.height, x2: (b.x + b.w) * vp.width, y2: (b.y + b.h) * vp.height }));
+    const columns = boxes.filter((b) => b.y2 - b.y1 > 3 * (b.x2 - b.x1) && b.y2 - b.y1 > vp.height * 0.15);
+    const coverOf = (c) => {
+      const cy1 = c.y1 + (c.y2 - c.y1) * 0.2, cy2 = c.y2 - (c.y2 - c.y1) * 0.15;
+      const a = (c.x2 - c.x1) * (cy2 - cy1) || 1;
+      let cov = 0;
+      for (const b of boxes) cov += (Math.max(0, Math.min(c.x2, b.x2) - Math.max(c.x1, b.x1)) * Math.max(0, Math.min(cy2, b.y2) - Math.max(cy1, b.y1))) / a;
+      return Math.min(1, cov);
+    };
+    let pRun = null, word = null, lastCy = null;
+    const flushP = () => { if (pRun) partial.push(pRun); pRun = null; };
+    const flushW = () => {
+      if (word && word.text.trim()) {
+        const cx = (word.x1 + word.x2) / 2;
+        if (word.cover < 0.5 && columns.some((b) => cx > b.x1 && cx < b.x2)) candidates.push({ page: i, text: word.text.trim() });
+      }
+      word = null;
+    };
+    for (const c of chars) {
+      if (!c || !c.ch.trim()) { flushP(); flushW(); lastCy = null; continue; }
+      const cov = coverOf(c);
+      if (cov > 0.08 && cov < 0.92) { if (pRun) pRun.text += c.ch; else pRun = { page: i, text: c.ch }; } else flushP();
+      const cy = (c.y1 + c.y2) / 2;
+      if (lastCy !== null && Math.abs(cy - lastCy) > (c.y2 - c.y1) * 0.5) flushW();
+      lastCy = cy;
+      if (!word) word = { text: "", x1: c.x1, x2: c.x2, cover: 0, n: 0 };
+      word.text += c.ch; word.x1 = Math.min(word.x1, c.x1); word.x2 = Math.max(word.x2, c.x2);
+      word.cover = (word.cover * word.n + cov) / ++word.n;
+    }
+    flushP(); flushW();
+  }
+  const pagesWith = new Map();
+  for (const c of candidates) { const k = squash(c.text); if (!pagesWith.has(k)) pagesWith.set(k, new Set()); pagesWith.get(k).add(c.page); }
+  const headerMin = Math.max(2, Math.ceil(boxed.length * 0.5));
+  const leftover = candidates.filter((c) => boxed.length < 2 ? !/^(성명|이름|학생명|성\s*명)$/.test(c.text) : pagesWith.get(squash(c.text)).size < headerMin);
+  return { partial, leftover };
+}
+
+/* ---------- save ---------- */
+async function buildRedactedPdf(dpi) {
+  const out = await PDFDocument.create({ updateMetadata: false });
+  for (let i = 0; i < state.pages.length; i++) {
+    busy(`안전한 PDF로 바꾸는 중… (${i + 1}/${state.pages.length}쪽)`, (i + 0.5) / (state.pages.length + 1));
+    const pg = state.pages[i];
+    const page = await state.doc.getPage(pg.num);
+    const vp = page.getViewport({ scale: Math.min(dpi / 72, 7000 / Math.max(pg.w, pg.h)) });
+    const c = document.createElement("canvas");
+    c.width = Math.ceil(vp.width); c.height = Math.ceil(vp.height);
+    const ctx = c.getContext("2d");
+    ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, c.width, c.height);
+    await page.render({ canvasContext: ctx, viewport: vp, background: "#ffffff" }).promise;
+    ctx.fillStyle = "#ffffff";
+    for (const b of pg.boxes) {
+      const x1 = Math.floor(b.x * c.width), y1 = Math.floor(b.y * c.height);
+      ctx.fillRect(x1, y1, Math.ceil((b.x + b.w) * c.width) - x1, Math.ceil((b.y + b.h) * c.height) - y1);
+    }
+    const blob = await new Promise((r) => c.toBlob(r, "image/jpeg", 0.92));
+    const img = await out.embedJpg(new Uint8Array(await blob.arrayBuffer()));
+    out.addPage([pg.w, pg.h]).drawImage(img, { x: 0, y: 0, width: pg.w, height: pg.h });
+    c.width = c.height = 1;
+  }
+  return out.save();
+}
+async function verify(bytes) {
+  const doc = await pdfjsLib.getDocument({ ...LOAD_OPTS, data: bytes.slice() }).promise;
+  let chars = 0, boxes = 0, white = 0;
+  try {
+    for (let i = 0; i < doc.numPages; i++) {
+      busy("저장한 결과를 검사하는 중…", (state.pages.length + (i + 1) / doc.numPages) / (state.pages.length + 1));
+      const page = await doc.getPage(i + 1);
+      chars += (await page.getTextContent()).items.reduce((n, it) => n + (it.str || "").trim().length, 0);
+      const pg = state.pages[i];
+      if (!pg?.boxes.length) continue;
+      const vp = page.getViewport({ scale: 1.5 });
+      const c = document.createElement("canvas");
+      c.width = Math.ceil(vp.width); c.height = Math.ceil(vp.height);
+      const ctx = c.getContext("2d", { willReadFrequently: true });
+      await page.render({ canvasContext: ctx, viewport: vp }).promise;
+      for (const b of pg.boxes) {
+        boxes++;
+        const x = Math.ceil(b.x * c.width) + 1, y = Math.ceil(b.y * c.height) + 1, w = Math.floor(b.w * c.width) - 2, h = Math.floor(b.h * c.height) - 2;
+        if (w < 1 || h < 1) { white++; continue; }
+        const d = ctx.getImageData(x, y, w, h).data;
+        let dark = 0;
+        for (let k = 0; k < d.length; k += 4) if (d[k] < 225 || d[k + 1] < 225 || d[k + 2] < 225) dark++;
+        if (dark / (w * h) < 0.002) white++;
+      }
+      c.width = c.height = 1;
+    }
+    return { pages: doc.numPages, chars, boxes, white, ok: doc.numPages === state.pages.length && chars === 0 && white === boxes };
+  } finally { doc.destroy(); }
+}
+async function writeOut(bytes, name) {
+  const blob = new Blob([bytes], { type: "application/pdf" });
+  if (state.dirHandle) {
+    try {
+      if ((await state.dirHandle.queryPermission?.({ mode: "readwrite" })) !== "granted" &&
+          (await state.dirHandle.requestPermission?.({ mode: "readwrite" })) !== "granted") throw new Error("permission");
+      let exists = true;
+      try { await state.dirHandle.getFileHandle(name); } catch { exists = false; }
+      if (exists && !(await dialog("같은 이름의 파일이 있습니다", `<b>${esc(name)}</b> 파일이 이미 있습니다. 덮어쓸까요?`, [["취소", false], ["덮어쓰기", true, "primary"]]))) return { where: "cancel" };
+      const w = await (await state.dirHandle.getFileHandle(name, { create: true })).createWritable();
+      await w.write(blob); await w.close();
+      return { where: "folder", label: `원본과 같은 폴더 '${state.dirHandle.name}'` };
+    } catch (e) { console.warn(e); }
+  }
+  if ("showSaveFilePicker" in window) {
+    try {
+      const opts = { suggestedName: name, types: [{ description: "PDF", accept: { "application/pdf": [".pdf"] } }] };
+      if (state.fileHandle) opts.startIn = state.fileHandle; else opts.id = "garim";
+      const h = await window.showSaveFilePicker(opts);
+      const w = await h.createWritable(); await w.write(blob); await w.close();
+      return { where: "picked", label: "선택한 위치", name: h.name };
+    } catch (e) { if (e.name === "AbortError") return { where: "cancel" }; console.warn(e); }
+  }
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+  return { where: "download", label: "다운로드 폴더" };
+}
+async function save() {
+  if (!state.doc) return;
+  const total = state.pages.reduce((n, p) => n + p.boxes.length, 0);
+  if (!total && !(await dialog("가린 곳이 없습니다", "가림이 하나도 없습니다. 그래도 저장할까요?", [["취소", false], ["그래도 저장", true]]))) return;
+  busy("가림 상태를 점검하는 중…", 0.05);
+  let issues;
+  try { issues = await preSaveCheck(); } finally { busy(false); }
+  if (issues.partial.length || issues.leftover.length) {
+    const first = Math.min(...[...issues.partial, ...issues.leftover].map((p) => p.page));
+    showPage(first);
+    const summarize = (items) => {
+      const by = new Map();
+      for (const it of items) {
+        const label = /[\p{L}\p{N}]/u.test(it.text) ? it.text : "(숫자·기호)";
+        if (!by.has(it.page)) by.set(it.page, []);
+        if (!by.get(it.page).includes(label)) by.get(it.page).push(label);
+      }
+      return "<ul>" + [...by].slice(0, 6).map(([p, a]) => `<li>${p + 1}쪽: <b>${a.slice(0, 6).map(esc).join(", ")}</b>${a.length > 6 ? " 외" : ""}</li>`).join("") + "</ul>" + (by.size > 6 ? `<p class="hint">외 ${by.size - 6}개 쪽</p>` : "");
+    };
+    let html = "";
+    if (issues.leftover.length) html += `<p style="margin:0"><b>가림 상자와 같은 세로줄에 가려지지 않은 글자</b>가 있습니다. 이름이 상자 밖에 남았을 수 있습니다.</p>${summarize(issues.leftover)}`;
+    if (issues.partial.length) html += `<p style="margin:0"><b>상자 경계에 걸쳐 반쯤만 가려진 글자</b>가 있습니다.</p>${summarize(issues.partial)}`;
+    html += '<p class="hint">해당 쪽을 열었습니다. 상자를 눌러 모서리를 끌어 넓히거나 새로 드래그해 주세요.</p>';
+    if (!(await dialog("⚠ 저장 전에 확인해 주세요", html, [["그래도 저장", true], ["돌아가서 고치기", false, "primary"]]))) return;
+  }
+  const name = outName(state.name);
+  let bytes, check;
+  try { bytes = await buildRedactedPdf(200); check = await verify(bytes); }
+  catch (e) { console.error(e); busy(false); return dialog("저장하지 못했습니다", "PDF를 만드는 중 문제가 생겼습니다.<br><small class='hint'>" + esc(e.message || e) + "</small>", [["확인", true, "primary"]]); }
+  busy(false);
+  if (!check.ok && !(await dialog("⚠ 검사에서 문제가 발견되었습니다",
+    `<ul><li>남은 글자: <b class="${check.chars ? "bad" : "ok"}">${check.chars}자</b></li><li>흰색으로 확인된 가림: <b class="${check.white < check.boxes ? "bad" : "ok"}">${check.white}/${check.boxes}곳</b></li></ul>안전을 위해 저장하지 않는 것을 권장합니다.`,
+    [["그래도 저장", true], ["저장 안 함", false, "primary"]]))) return;
+  const res = await writeOut(bytes, name);
+  if (res.where === "cancel") return;
+  state.dirty = false; updateUI();
+  dialog("✓ 저장했습니다",
+    `<p style="margin:0 0 8px"><b>${esc(res.name || name)}</b><br><span class="hint">${esc(res.label)}에 저장</span></p>
+     <ul><li class="ok">남은 글자 0자 · 복사나 검색으로 이름이 나오지 않습니다</li><li class="ok">가린 ${check.boxes}곳 모두 흰색으로 확인</li><li>${check.pages}쪽 · 원본 파일은 그대로입니다</li></ul>` +
+    (res.where === "download" ? '<p class="hint">이 화면에서는 폴더에 직접 저장할 수 없어 <b>다운로드 폴더</b>에 저장했습니다. 원본 옆에 바로 저장하려면 이 HTML 파일을 크롬/엣지에서 직접 열고 <b>폴더 열기</b>를 쓰세요.</p>' : ""),
+    [["확인", true, "primary"]]);
+}
+
+/* ---------- chrome ---------- */
+function updateUI() {
+  const has = !!state.doc;
+  $("setupBtn").disabled = $("saveBtn").disabled = !has;
+  $("backBtn").hidden = $("hist").hidden = !has;
+  if (!has) return;
+  $("docName").textContent = (state.dirty ? "● " : "") + state.name;
+  $("docTarget").textContent = "저장 → " + outName(state.name) + (state.dirHandle ? " · 같은 폴더에 바로 저장" : "");
+  $("pg").textContent = `${state.cur + 1} / ${state.pages.length}`;
+  $("prev").disabled = state.cur === 0; $("next").disabled = state.cur === state.pages.length - 1;
+  $("undo").disabled = !state.undo.length; $("redo").disabled = !state.redo.length;
+  $("bannerTxt").innerHTML = bannerText(false);
+  $("clean").classList.toggle("on", state.clean);
+  pageEl.classList.toggle("clean", state.clean);
+  document.title = (state.dirty ? "● " : "") + state.name + " · PDF 이름 가리개";
+}
+
+$("openBtn").onclick = (e) => { e.stopPropagation(); $("openMenu").hidden = !$("openMenu").hidden; };
+document.addEventListener("click", () => ($("openMenu").hidden = true));
+$("mFolder").onclick = $("eFolder").onclick = openFolder;
+$("mFile").onclick = $("eFile").onclick = openFile;
+$("drop").onclick = openFile;
+$("setupBtn").onclick = $("bannerSetup").onclick = openSetup;
+$("saveBtn").onclick = save;
+$("backBtn").onclick = async () => {
+  if (!(await confirmDiscard())) return;
+  state.doc?.destroy();
+  Object.assign(state, { doc: null, name: "", fileHandle: null, pages: [], cur: 0, sel: null, undo: [], redo: [], dirty: false });
+  $("rail").innerHTML = ""; layer.querySelectorAll(".box").forEach((n) => n.remove());
+  $("rail").hidden = $("workArea").hidden = $("doc").hidden = true;
+  $("empty").hidden = false; $("headSpacer").hidden = false;
+  document.title = "PDF 이름 가리개";
+  updateUI();
+};
+$("undo").onclick = undo; $("redo").onclick = redo;
+$("prev").onclick = () => showPage(state.cur - 1);
+$("next").onclick = () => showPage(state.cur + 1);
+$("zoomIn").onclick = () => { state.zoom = clamp(state.zoom * 1.2, 0.5, 4); layout(); };
+$("zoomOut").onclick = () => { state.zoom = clamp(state.zoom / 1.2, 0.5, 4); layout(); };
+$("zoomFit").onclick = () => { state.zoom = 1; layout(); };
+$("clean").onclick = () => { state.clean = !state.clean; updateUI(); };
+
+document.addEventListener("keydown", (e) => {
+  if (!state.doc || $("dlg").open || $("setup").open || e.target.matches("textarea,input")) return;
+  const mod = e.ctrlKey || e.metaKey, k = e.key.toLowerCase();
+  if (mod && k === "s") { e.preventDefault(); save(); }
+  else if (mod && k === "z") { e.preventDefault(); e.shiftKey ? redo() : undo(); }
+  else if (mod && k === "y") { e.preventDefault(); redo(); }
+  else if ((e.key === "Delete" || e.key === "Backspace") && state.sel) { e.preventDefault(); deleteBox(state.sel, true); }
+  else if (e.key === "Escape" && state.sel) { state.sel = null; drawBoxes(); }
+  else if (state.sel && e.key.startsWith("Arrow")) {
+    e.preventDefault();
+    const b = curBoxes().find((x) => x.id === state.sel), pg = state.pages[state.cur];
+    const step = (e.shiftKey ? 10 : 1) / pageEl.clientWidth, before = snapshot();
+    if (e.key === "ArrowLeft") b.x = clamp(b.x - step, 0, 1 - b.w);
+    if (e.key === "ArrowRight") b.x = clamp(b.x + step, 0, 1 - b.w);
+    if (e.key === "ArrowUp") b.y = clamp(b.y - step * pg.w / pg.h, 0, 1 - b.h);
+    if (e.key === "ArrowDown") b.y = clamp(b.y + step * pg.w / pg.h, 0, 1 - b.h);
+    syncGroup(b); drawBoxes(); commit(before);
+  }
+  else if (e.key === "ArrowRight" || e.key === "PageDown") showPage(state.cur + 1);
+  else if (e.key === "ArrowLeft" || e.key === "PageUp") showPage(state.cur - 1);
+});
+
+/* drag & drop */
+window.addEventListener("dragover", (e) => { e.preventDefault(); $("drop").classList.add("over"); });
+window.addEventListener("dragleave", (e) => { if (!e.relatedTarget) $("drop").classList.remove("over"); });
+window.addEventListener("drop", async (e) => {
+  e.preventDefault(); $("drop").classList.remove("over");
+  const item = [...(e.dataTransfer.items || [])].find((i) => i.kind === "file");
+  if (!item) return;
+  const hp = item.getAsFileSystemHandle ? item.getAsFileSystemHandle().catch(() => null) : Promise.resolve(null);
+  const file = item.getAsFile();
+  const h = await hp;
+  if (!(await confirmDiscard())) return;
+  if (h && h.kind === "directory") return useFolder(h);
+  loadFile(file || (await h.getFile()), h && h.kind === "file" ? h : null, null);
+});
+window.addEventListener("beforeunload", (e) => { if (state.dirty) { e.preventDefault(); e.returnValue = ""; } });
+
+/* remember last folder (only the folder handle, kept in this browser) */
+function idb() {
+  return new Promise((res, rej) => {
+    const r = indexedDB.open("pdf-garim", 1);
+    r.onupgradeneeded = () => r.result.createObjectStore("kv");
+    r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+  });
+}
+(async () => {
+  try {
+    if (!("showDirectoryPicker" in window)) return;
+    const db = await idb();
+    const dir = await new Promise((res) => { const q = db.transaction("kv").objectStore("kv").get("folder"); q.onsuccess = () => res(q.result); q.onerror = () => res(null); });
+    if (!dir) return;
+    const b = $("reopen");
+    b.hidden = false; b.textContent = `↺ 지난 폴더 '${dir.name}' 다시 열기`;
+    b.onclick = async () => { try { if ((await dir.requestPermission({ mode: "readwrite" })) === "granted") useFolder(dir); } catch {} };
+  } catch {}
+})();
+
+updateUI();
+window.__garim = { state, loadFile, useFolder, verify, buildRedactedPdf, showPage };
+})();
+
+</script>
+</body>
+</html>
