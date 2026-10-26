@@ -867,7 +867,9 @@ async function buildRedactedPdf(dpi) {
     c.width = Math.ceil(vp.width); c.height = Math.ceil(vp.height);
     const ctx = c.getContext("2d");
     ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, c.width, c.height);
-    await page.render({ canvasContext: ctx, viewport: vp, background: "#ffffff" }).promise;
+    // "print" intent renders without requestAnimationFrame, so saving keeps going
+    // even when the window is hidden or the person switches tabs.
+    await page.render({ canvasContext: ctx, viewport: vp, background: "#ffffff", intent: "print" }).promise;
     ctx.fillStyle = "#ffffff";
     for (const b of pg.boxes) {
       const x1 = Math.floor(b.x * c.width), y1 = Math.floor(b.y * c.height);
@@ -894,7 +896,7 @@ async function verify(bytes) {
       const c = document.createElement("canvas");
       c.width = Math.ceil(vp.width); c.height = Math.ceil(vp.height);
       const ctx = c.getContext("2d", { willReadFrequently: true });
-      await page.render({ canvasContext: ctx, viewport: vp }).promise;
+      await page.render({ canvasContext: ctx, viewport: vp, intent: "print" }).promise;
       for (const b of pg.boxes) {
         boxes++;
         const x = Math.ceil(b.x * c.width) + 1, y = Math.ceil(b.y * c.height) + 1, w = Math.floor(b.w * c.width) - 2, h = Math.floor(b.h * c.height) - 2;
